@@ -27,8 +27,33 @@ type PackageManifest struct {
 	metav1.TypeMeta
 	metav1.ObjectMeta
 
-	Spec PackageManifestSpec
-	Test PackageManifestTest
+	Repository PackageManifestRepository
+	Spec       PackageManifestSpec
+	Test       PackageManifestTest
+}
+
+// PackageManifestRepository hols metadata for the inclusion in a repository.
+type PackageManifestRepository struct {
+	// Human readable name to display in a repository.
+	DisplayName string
+	// Short description of the package.
+	ShortDescription string
+	// Package maintainers.
+	Maintainers []PackageMaintainer
+	// Links to documentation, project website, github, etc.
+	Links []PackageLink
+}
+
+// PackageMaintainer represents contact information to reach maintainers of the package.
+type PackageMaintainer struct {
+	Name  string
+	Email string
+}
+
+// PackageLink represents an external http/https link to e.g. the project repository or homepage.
+type PackageLink struct {
+	Name string
+	URL  string
 }
 
 // PackageManifestScope declares the available scopes to install this package in.

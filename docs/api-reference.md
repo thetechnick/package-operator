@@ -1220,6 +1220,7 @@ containing file-based manifests for the packaging infrastructure.
 
 * [PackageManifest](#packagemanifest)
 * [PackageManifestLock](#packagemanifestlock)
+* [RepositoryManifest](#repositorymanifest)
 
 
 ### PackageManifest
@@ -1235,6 +1236,15 @@ kind: PackageManifest
 metadata:
   name: example
   namespace: default
+repository:
+  displayName: lorem
+  links:
+  - name: amet
+    url: consetetur
+  maintainers:
+  - email: sit
+    name: dolor
+  shortDescription: ipsum
 spec:
   availabilityProbes:
   - corev1alpha1.ObjectSetProbe
@@ -1242,37 +1252,37 @@ spec:
   config:
     openAPIV3Schema: apiextensionsv1.JSONSchemaProps
   images:
-  - image: sit
-    name: dolor
+  - image: diam
+    name: sed
   phases:
-  - class: ipsum
-    name: lorem
+  - class: elitr
+    name: sadipscing
   scopes:
   - PackageManifestScope
 test:
   kubeconform:
-    kubernetesVersion: tempor
+    kubernetesVersion: consetetur
     schemaLocations:
-    - lorem
+    - sadipscing
   template:
   - context:
       config: runtime.RawExtension
       environment:
         kubernetes:
-          version: elitr
+          version: lorem
         openShift:
-          version: sed
+          version: ipsum
         proxy:
-          httpProxy: diam
-          httpsProxy: nonumy
-          noProxy: eirmod
+          httpProxy: dolor
+          httpsProxy: sit
+          noProxy: amet
       package:
         metadata:
           annotations: map[string]string
           labels: map[string]string
-          name: consetetur
-          namespace: sadipscing
-    name: amet
+          name: eirmod
+          namespace: tempor
+    name: nonumy
 
 ```
 
@@ -1280,6 +1290,7 @@ test:
 | Field | Description |
 | ----- | ----------- |
 | `metadata` <br>metav1.ObjectMeta |  |
+| `repository` <br><a href="#packagemanifestrepository">PackageManifestRepository</a> | PackageManifestRepository hols metadata for the inclusion in a repository. |
 | `spec` <br><a href="#packagemanifestspec">PackageManifestSpec</a> | PackageManifestSpec represents the spec of the packagemanifest containing the details about phases and availability probes. |
 | `test` <br><a href="#packagemanifesttest">PackageManifestTest</a> | PackageManifestTest configures test cases. |
 
@@ -1299,9 +1310,9 @@ metadata:
   namespace: default
 spec:
   images:
-  - digest: sit
-    image: dolor
-    name: ipsum
+  - digest: diam
+    image: sed
+    name: elitr
 
 ```
 
@@ -1310,6 +1321,28 @@ spec:
 | ----- | ----------- |
 | `metadata` <br>metav1.ObjectMeta |  |
 | `spec` <br><a href="#packagemanifestlockspec">PackageManifestLockSpec</a> |  |
+
+
+### RepositoryManifest
+
+
+
+
+**Example**
+
+```yaml
+apiVersion: manifests.package-operator.run/v1alpha1
+kind: RepositoryManifest
+metadata:
+  name: example
+  namespace: default
+
+```
+
+
+| Field | Description |
+| ----- | ----------- |
+| `metadata` <br>metav1.ObjectMeta |  |
 
 
 
@@ -1374,6 +1407,34 @@ Used in:
 * [PackageEnvironment](#packageenvironment)
 
 
+### PackageLink
+
+PackageLink represents an external http/https link to e.g. the project repository or homepage.
+
+| Field | Description |
+| ----- | ----------- |
+| `name` <b>required</b><br>string |  |
+| `url` <b>required</b><br>string |  |
+
+
+Used in:
+* [PackageManifestRepository](#packagemanifestrepository)
+
+
+### PackageMaintainer
+
+PackageMaintainer represents contact information to reach maintainers of the package.
+
+| Field | Description |
+| ----- | ----------- |
+| `name` <b>required</b><br>string |  |
+| `email` <br>string |  |
+
+
+Used in:
+* [PackageManifestRepository](#packagemanifestrepository)
+
+
 ### PackageManifestImage
 
 PackageManifestImage specifies an image tag to be resolved.
@@ -1428,6 +1489,22 @@ Used in:
 
 Used in:
 * [PackageManifestSpec](#packagemanifestspec)
+
+
+### PackageManifestRepository
+
+PackageManifestRepository hols metadata for the inclusion in a repository.
+
+| Field | Description |
+| ----- | ----------- |
+| `displayName` <b>required</b><br>string | Human readable name to display in a repository. |
+| `shortDescription` <br>string | Short description of the package. |
+| `maintainers` <br><a href="#packagemaintainer">[]PackageMaintainer</a> | Package maintainers. |
+| `links` <br><a href="#packagelink">[]PackageLink</a> | Links to documentation, project website, github, etc. |
+
+
+Used in:
+* [PackageManifest](#packagemanifest)
 
 
 ### PackageManifestSpec

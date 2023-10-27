@@ -36,8 +36,33 @@ type PackageManifest struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 
-	Spec PackageManifestSpec `json:"spec,omitempty"`
-	Test PackageManifestTest `json:"test,omitempty"`
+	Repository PackageManifestRepository `json:"repository,omitempty"`
+	Spec       PackageManifestSpec       `json:"spec,omitempty"`
+	Test       PackageManifestTest       `json:"test,omitempty"`
+}
+
+// PackageManifestRepository hols metadata for the inclusion in a repository.
+type PackageManifestRepository struct {
+	// Human readable name to display in a repository.
+	DisplayName string `json:"displayName"`
+	// Short description of the package.
+	ShortDescription string `json:"shortDescription,omitempty"`
+	// Package maintainers.
+	Maintainers []PackageMaintainer `json:"maintainers,omitempty"`
+	// Links to documentation, project website, github, etc.
+	Links []PackageLink `json:"links,omitempty"`
+}
+
+// PackageMaintainer represents contact information to reach maintainers of the package.
+type PackageMaintainer struct {
+	Name  string `json:"name"`
+	Email string `json:"email,omitempty"`
+}
+
+// PackageLink represents an external http/https link to e.g. the project repository or homepage.
+type PackageLink struct {
+	Name string `json:"name"`
+	URL  string `json:"url"`
 }
 
 // PackageManifestScope declares the available scopes to install this package in.
