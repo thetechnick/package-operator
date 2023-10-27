@@ -1221,6 +1221,7 @@ containing file-based manifests for the packaging infrastructure.
 * [PackageManifest](#packagemanifest)
 * [PackageManifestLock](#packagemanifestlock)
 * [RepositoryManifest](#repositorymanifest)
+* [RepositoryPackageIndex](#repositorypackageindex)
 
 
 ### PackageManifest
@@ -1336,6 +1337,9 @@ kind: RepositoryManifest
 metadata:
   name: example
   namespace: default
+spec:
+  index:
+  - name: nonumy
 
 ```
 
@@ -1343,6 +1347,38 @@ metadata:
 | Field | Description |
 | ----- | ----------- |
 | `metadata` <br>metav1.ObjectMeta |  |
+| `spec` <br><a href="#repositorymanifestspec">RepositoryManifestSpec</a> |  |
+
+
+### RepositoryPackageIndex
+
+
+
+
+**Example**
+
+```yaml
+apiVersion: manifests.package-operator.run/v1alpha1
+kind: RepositoryPackageIndex
+metadata:
+  name: example
+  namespace: default
+spec:
+  index:
+  - digest: lorem
+    image: ipsum
+    versions:
+    - tempor
+  versions:
+  - eirmod
+
+```
+
+
+| Field | Description |
+| ----- | ----------- |
+| `metadata` <br>metav1.ObjectMeta |  |
+| `spec` <br><a href="#repositorypackageindexspec">RepositoryPackageIndexSpec</a> |  |
 
 
 
@@ -1578,6 +1614,61 @@ Used in:
 
 Used in:
 * [PackageManifestTest](#packagemanifesttest)
+
+
+### RepositoryManifestIndexEntry
+
+
+
+| Field | Description |
+| ----- | ----------- |
+| `name` <b>required</b><br>string |  |
+
+
+Used in:
+* [RepositoryManifestSpec](#repositorymanifestspec)
+
+
+### RepositoryManifestSpec
+
+
+
+| Field | Description |
+| ----- | ----------- |
+| `index` <br><a href="#repositorymanifestindexentry">[]RepositoryManifestIndexEntry</a> |  |
+
+
+Used in:
+* [RepositoryManifest](#repositorymanifest)
+
+
+### RepositoryPackageIndexEntry
+
+
+
+| Field | Description |
+| ----- | ----------- |
+| `versions` <b>required</b><br>[]string | Versions that reference this digest. |
+| `digest` <b>required</b><br>string | Digest of the package image. |
+| `image` <b>required</b><br>string | Image of the package. e.g. quay.io/xxx/xxx. |
+
+
+Used in:
+* [RepositoryPackageIndexSpec](#repositorypackageindexspec)
+
+
+### RepositoryPackageIndexSpec
+
+
+
+| Field | Description |
+| ----- | ----------- |
+| `versions` <br>[]string |  |
+| `index` <br><a href="#repositorypackageindexentry">[]RepositoryPackageIndexEntry</a> |  |
+
+
+Used in:
+* [RepositoryPackageIndex](#repositorypackageindex)
 
 
 ### TemplateContext

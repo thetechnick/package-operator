@@ -1,0 +1,6 @@
+metadata:
+  creationTimestamp: "2023-10-31T14:59:47Z"
+  name: my-repo
+spec:
+  Index:
+  - Name: my-pkg

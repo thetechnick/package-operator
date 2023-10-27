@@ -37,6 +37,16 @@ func manifestLockFromFile(
 	return ManifestFromFile[manifests.PackageManifestLock](ctx, scheme, path, manifestBytes)
 }
 
+// Converts the internal version of an PackageManifest into it's v1alpha1 representation.
+func ToV1Alpha1Manifest(in *manifests.PackageManifest) (*manifestsv1alpha1.PackageManifest, error) {
+	out := &manifestsv1alpha1.PackageManifest{}
+	if err := scheme.Convert(in, out, nil); err != nil {
+		return nil, err
+	}
+	out.SetGroupVersionKind(manifestsv1alpha1.GroupVersion.WithKind("PackageManifest"))
+	return out, nil
+}
+
 // Converts the internal version of an PackageManifestLock into it's v1alpha1 representation.
 func ToV1Alpha1ManifestLock(in *manifests.PackageManifestLock) (*manifestsv1alpha1.PackageManifestLock, error) {
 	out := &manifestsv1alpha1.PackageManifestLock{}

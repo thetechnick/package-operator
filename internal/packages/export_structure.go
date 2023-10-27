@@ -7,6 +7,8 @@ var (
 	DefaultStructuralLoader = packagestructure.DefaultStructuralLoader
 	// Creates a new StructuralLoaderInstance.
 	NewStructuralLoader = packagestructure.NewStructuralLoader
+	// Converts the internal version of an PackageManifest into it's v1alpha1 representation.
+	ToV1Alpha1Manifest = packagestructure.ToV1Alpha1Manifest
 	// Converts the internal version of an PackageManifestLock into it's v1alpha1 representation.
 	ToV1Alpha1ManifestLock = packagestructure.ToV1Alpha1ManifestLock
 )
