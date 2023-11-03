@@ -14,6 +14,7 @@ import (
 	"sigs.k8s.io/yaml"
 
 	"package-operator.run/internal/apis/manifests"
+	"package-operator.run/internal/packages/internal/packageimport"
 	"package-operator.run/internal/packages/internal/packagestructure"
 	"package-operator.run/internal/packages/internal/packagetypes"
 )
@@ -76,6 +77,37 @@ func ReadPackageIndex(ctx context.Context, fsys FS, pkgName string) (index *Pack
 
 func (pi *PackageIndex) IsEmpty() bool {
 	return len(pi.digestToMeta) == 0
+}
+
+func (pi *PackageIndex) GetLatestEntry() manifests.RepositoryPackageIndexEntry {
+	latest := pi.orderedVersions[0].String()
+	return pi.GetEntry(latest)
+}
+
+func (pi *PackageIndex) GetEntry(version string) manifests.RepositoryPackageIndexEntry {
+	digest := pi.versionToDigest[version]
+	return pi.digestToMeta[digest]
+}
+
+func (pi *PackageIndex) GetPackage(ctx context.Context, version string) (*packagetypes.Package, error) {
+	digest := pi.versionToDigest[version]
+	fsys, err := pi.fsys.SubDir(filepath.Join(pi.manifest.Name, digest))
+	if err != nil {
+		return nil, err
+	}
+	rawPkg, err := packageimport.FromFS(ctx, fsys)
+	if err != nil {
+		return nil, err
+	}
+	return packagestructure.DefaultStructuralLoader.Load(ctx, rawPkg)
+}
+
+func (pi *PackageIndex) GetVersions() []string {
+	versions := make([]string, len(pi.orderedVersions))
+	for i := range pi.orderedVersions {
+		versions[i] = pi.orderedVersions[i].String()
+	}
+	return versions
 }
 
 func (pi *PackageIndex) Remove(

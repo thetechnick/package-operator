@@ -10,6 +10,7 @@ type FS interface {
 	fs.FS
 	WriteFile(name string, content []byte) error
 	RemoveAll(name string) error
+	SubDir(path string) (fs.FS, error)
 }
 
 func DirFS(path string) FS {
@@ -22,6 +23,14 @@ func DirFS(path string) FS {
 type dirFS struct {
 	fs.FS
 	path string
+}
+
+func (fs *dirFS) SubDir(path string) (fs.FS, error) {
+	newPath, err := filepath.Rel(fs.path, path)
+	if err != nil {
+		return nil, err
+	}
+	return DirFS(newPath), nil
 }
 
 func (fs *dirFS) WriteFile(name string, content []byte) error {
