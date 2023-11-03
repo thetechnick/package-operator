@@ -1,20 +1,22 @@
-Spec:
-  Index:
-  - Digest: "67890"
-    Image: quay.io/example/example
-    Versions:
-    - v1.1.0
-    - v1.1.0-rc.1
-  - Digest: "12345"
-    Image: quay.io/example/example
-    Versions:
+apiVersion: manifests.package-operator.run/v1alpha1
+kind: RepositoryPackageIndex
+metadata:
+  creationTimestamp: "2023-11-03T09:24:21Z"
+  name: my-pkg
+spec:
+  index:
+  - digest: "12345"
+    image: quay.io/example/example
+    versions:
     - v1.0.0
     - v1.0.0-rc.1
-  Versions:
+  - digest: "67890"
+    image: quay.io/example/example
+    versions:
+    - v1.1.0
+    - v1.1.0-rc.1
+  versions:
   - v1.1.0
   - v1.1.0-rc.1
   - v1.0.0
   - v1.0.0-rc.1
-metadata:
-  creationTimestamp: "2023-10-31T14:59:47Z"
-  name: my-pkg

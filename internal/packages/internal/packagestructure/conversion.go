@@ -14,10 +14,10 @@ import (
 )
 
 type manifestConstraint interface {
-	manifests.PackageManifest | manifests.PackageManifestLock
+	manifests.PackageManifest | manifests.PackageManifestLock | manifests.RepositoryPackageIndex | manifests.RepositoryManifest
 }
 
-func ManifestFromFile[T manifestConstraint, PT interface {
+func manifestFromFile[T manifestConstraint, PT interface {
 	runtime.Object
 	*T
 }](

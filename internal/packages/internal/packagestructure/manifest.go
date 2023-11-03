@@ -10,7 +10,7 @@ import (
 	"package-operator.run/internal/packages/internal/packagetypes"
 )
 
-func manifestFromFiles(ctx context.Context, scheme *runtime.Scheme, files packagetypes.Files) (*manifests.PackageManifest, error) {
+func packageManifestFromFiles(ctx context.Context, scheme *runtime.Scheme, files packagetypes.Files) (*manifests.PackageManifest, error) {
 	if bothExtensions(files, packagetypes.PackageManifestFilename) {
 		return nil, packagetypes.ViolationError{
 			Reason: packagetypes.ViolationReasonPackageManifestDuplicated,
@@ -20,21 +20,14 @@ func manifestFromFiles(ctx context.Context, scheme *runtime.Scheme, files packag
 	if !manifestFound {
 		return nil, packagetypes.ErrManifestNotFound
 	}
-	return manifestFromFile(ctx, scheme, manifestPath, manifestBytes)
+	return packageManifestFromFile(ctx, scheme, manifestPath, manifestBytes)
 }
 
-func manifestFromFile(
+func packageManifestFromFile(
 	ctx context.Context, scheme *runtime.Scheme,
 	path string, manifestBytes []byte,
 ) (*manifests.PackageManifest, error) {
-	return ManifestFromFile[manifests.PackageManifest](ctx, scheme, path, manifestBytes)
-}
-
-func manifestLockFromFile(
-	ctx context.Context, scheme *runtime.Scheme,
-	path string, manifestBytes []byte,
-) (*manifests.PackageManifestLock, error) {
-	return ManifestFromFile[manifests.PackageManifestLock](ctx, scheme, path, manifestBytes)
+	return manifestFromFile[manifests.PackageManifest](ctx, scheme, path, manifestBytes)
 }
 
 // Converts the internal version of an PackageManifest into it's v1alpha1 representation.
@@ -45,6 +38,13 @@ func ToV1Alpha1Manifest(in *manifests.PackageManifest) (*manifestsv1alpha1.Packa
 	}
 	out.SetGroupVersionKind(manifestsv1alpha1.GroupVersion.WithKind("PackageManifest"))
 	return out, nil
+}
+
+func packageManifestLockFromFile(
+	ctx context.Context, scheme *runtime.Scheme,
+	path string, manifestBytes []byte,
+) (*manifests.PackageManifestLock, error) {
+	return manifestFromFile[manifests.PackageManifestLock](ctx, scheme, path, manifestBytes)
 }
 
 // Converts the internal version of an PackageManifestLock into it's v1alpha1 representation.

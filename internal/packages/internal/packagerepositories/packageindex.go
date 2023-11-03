@@ -14,6 +14,7 @@ import (
 	"sigs.k8s.io/yaml"
 
 	"package-operator.run/internal/apis/manifests"
+	"package-operator.run/internal/packages/internal/packagestructure"
 	"package-operator.run/internal/packages/internal/packagetypes"
 )
 
@@ -54,15 +55,16 @@ func NewPackageIndex(name string, fsys FS) *PackageIndex {
 }
 
 func ReadPackageIndex(ctx context.Context, fsys FS, pkgName string) (index *PackageIndex, err error) {
-	fbytes, err := fs.ReadFile(fsys, filepath.Join(pkgName, packageIndexFilename))
+	path := filepath.Join(pkgName, packageIndexFilename)
+	fbytes, err := fs.ReadFile(fsys, path)
 	if err != nil {
 		return
 	}
 
 	index = newPackageIndex(fsys)
-	index.manifest = &manifests.RepositoryPackageIndex{}
-	if err = yaml.Unmarshal(fbytes, index.manifest); err != nil {
-		return
+	index.manifest, err = packagestructure.RepositoryPackageIndexFromFile(ctx, path, fbytes)
+	if err != nil {
+		return nil, err
 	}
 	for _, entry := range index.manifest.Spec.Index {
 		if err := index.add(ctx, entry); err != nil {
@@ -109,20 +111,27 @@ func (pi *PackageIndex) Add(
 		return fmt.Errorf("package index for package %s, got: %s", pi.manifest.Name, pkg.Manifest.Name)
 	}
 
-	manifestYaml, err := yaml.Marshal(pkg.Manifest)
+	v1alpha1Manifest, err := packagestructure.ToV1Alpha1Manifest(pkg.Manifest)
 	if err != nil {
 		return err
 	}
-	path := filepath.Join(pkg.Manifest.Name, entry.Digest, packageManifestFilename)
-	if err := pi.fsys.WriteFile(path, manifestYaml); err != nil {
+	manifestYaml, err := yaml.Marshal(v1alpha1Manifest)
+	if err != nil {
+		return err
+	}
+	if err := pi.fsys.WriteFile(filepath.Join(pkg.Manifest.Name, entry.Digest, packageManifestFilename), manifestYaml); err != nil {
 		return err
 	}
 	if pkg.ManifestLock != nil {
-		manifestLockYaml, err := yaml.Marshal(pkg.Manifest)
+		v1alpha1ManifestLock, err := packagestructure.ToV1Alpha1ManifestLock(pkg.ManifestLock)
 		if err != nil {
 			return err
 		}
-		if err := pi.fsys.WriteFile(path, manifestLockYaml); err != nil {
+		manifestLockYaml, err := yaml.Marshal(v1alpha1ManifestLock)
+		if err != nil {
+			return err
+		}
+		if err := pi.fsys.WriteFile(filepath.Join(pkg.Manifest.Name, entry.Digest, packageManifestLockFilename), manifestLockYaml); err != nil {
 			return err
 		}
 	}
@@ -174,9 +183,14 @@ func (pi *PackageIndex) Write(ctx context.Context) error {
 	for _, v := range pi.orderedVersions {
 		pi.manifest.Spec.Versions = append(pi.manifest.Spec.Versions, "v"+v.String())
 	}
-
 	pi.manifest.CreationTimestamp = metav1.Now()
-	indexBytes, err := yaml.Marshal(pi.manifest)
+
+	// Convert
+	v1alpha1Manifest, err := packagestructure.ToV1Alpha1RepositoryPackageIndex(pi.manifest)
+	if err != nil {
+		return err
+	}
+	indexBytes, err := yaml.Marshal(v1alpha1Manifest)
 	if err != nil {
 		return err
 	}

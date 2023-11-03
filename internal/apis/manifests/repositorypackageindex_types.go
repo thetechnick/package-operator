@@ -23,3 +23,5 @@ type RepositoryPackageIndexEntry struct {
 	// Image of the package. e.g. quay.io/xxx/xxx.
 	Image string
 }
+
+func init() { register(&RepositoryPackageIndex{}) }

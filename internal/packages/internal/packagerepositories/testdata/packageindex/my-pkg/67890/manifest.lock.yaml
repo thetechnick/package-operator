@@ -1,13 +1,7 @@
 apiVersion: manifests.package-operator.run/v1alpha1
-kind: PackageManifest
+kind: PackageManifestLock
 metadata:
   creationTimestamp: null
   name: my-pkg
-repository:
-  displayName: banana
 spec:
-  config: {}
   images: null
-  phases: null
-  scopes: null
-test: {}

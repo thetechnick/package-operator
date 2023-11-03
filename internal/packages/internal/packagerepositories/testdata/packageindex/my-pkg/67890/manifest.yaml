@@ -1,18 +1,13 @@
-Repository:
-  DisplayName: banana
-  Links: null
-  Maintainers: null
-  ShortDescription: ""
-Spec:
-  AvailabilityProbes: null
-  Components: null
-  Config:
-    OpenAPIV3Schema: null
-  Images: null
-  Phases: null
-  Scopes: null
-Test:
-  Kubeconform: null
-  Template: null
-creationTimestamp: null
-name: my-pkg
+apiVersion: manifests.package-operator.run/v1alpha1
+kind: PackageManifest
+metadata:
+  creationTimestamp: null
+  name: my-pkg
+repository:
+  displayName: banana
+spec:
+  config: {}
+  images: null
+  phases: null
+  scopes: null
+test: {}

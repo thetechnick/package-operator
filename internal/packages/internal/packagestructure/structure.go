@@ -34,7 +34,7 @@ func (l *StructuralLoader) Load(
 func (l *StructuralLoader) LoadComponent(
 	ctx context.Context, rawPkg *packagetypes.RawPackage, componentName string,
 ) (*packagetypes.Package, error) {
-	rootManifest, err := manifestFromFiles(ctx, l.scheme, rawPkg.Files)
+	rootManifest, err := packageManifestFromFiles(ctx, l.scheme, rawPkg.Files)
 	if err != nil {
 		return nil, err
 	}
@@ -71,7 +71,7 @@ func (l *StructuralLoader) load(ctx context.Context, files packagetypes.Files, c
 
 	// PackageManifest
 	var err error
-	pkg.Manifest, err = manifestFromFiles(ctx, l.scheme, files)
+	pkg.Manifest, err = packageManifestFromFiles(ctx, l.scheme, files)
 	if err != nil {
 		return nil, err
 	}
@@ -87,7 +87,7 @@ func (l *StructuralLoader) load(ctx context.Context, files packagetypes.Files, c
 	}
 	if manifestLockBytes, manifestLockPath, manifestLockFound := getFile(
 		files, packagetypes.PackageManifestLockFilename); manifestLockFound {
-		pkg.ManifestLock, err = manifestLockFromFile(ctx, l.scheme, manifestLockPath, manifestLockBytes)
+		pkg.ManifestLock, err = packageManifestLockFromFile(ctx, l.scheme, manifestLockPath, manifestLockBytes)
 		if err != nil {
 			return nil, err
 		}

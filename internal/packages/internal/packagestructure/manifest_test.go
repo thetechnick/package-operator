@@ -53,7 +53,7 @@ func Test_manifestFromFile(t *testing.T) {
 			t.Parallel()
 			ctx := context.Background()
 			path := "xxx.yml"
-			m, err := manifestFromFile(ctx, scheme, path, test.yamlBytes)
+			m, err := packageManifestFromFile(ctx, scheme, path, test.yamlBytes)
 			assert.Nil(t, m)
 			var verr packagetypes.ViolationError
 			if assert.ErrorAs(t, err, &verr) {
@@ -106,7 +106,7 @@ func Test_manifestLockFromFile(t *testing.T) {
 			t.Parallel()
 			ctx := context.Background()
 			path := "xxx.yml"
-			m, err := manifestLockFromFile(ctx, scheme, path, test.yamlBytes)
+			m, err := packageManifestLockFromFile(ctx, scheme, path, test.yamlBytes)
 			assert.Nil(t, m)
 			var verr packagetypes.ViolationError
 			if assert.ErrorAs(t, err, &verr) {

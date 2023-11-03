@@ -10,6 +10,7 @@ import (
 	"sigs.k8s.io/yaml"
 
 	"package-operator.run/internal/apis/manifests"
+	"package-operator.run/internal/packages/internal/packagestructure"
 	"package-operator.run/internal/packages/internal/packagetypes"
 )
 
@@ -42,10 +43,9 @@ func NewRepositoryIndex(name string, fsys FS) *RepositoryIndex {
 	return pi
 }
 
-func ReadRepositoryIndex(ctx context.Context, fsys FS) (index *RepositoryIndex, exists bool, err error) {
+func ReadRepositoryIndex(ctx context.Context, fsys FS) (index *RepositoryIndex, err error) {
 	fbytes, err := fs.ReadFile(fsys, repositoryManifestFilename)
 	if os.IsNotExist(err) {
-		exists = false
 		err = nil
 		return
 	}
@@ -53,17 +53,15 @@ func ReadRepositoryIndex(ctx context.Context, fsys FS) (index *RepositoryIndex, 
 		return
 	}
 
-	exists = true
-
 	index = newRepositoryIndex(fsys)
-	index.manifest = &manifests.RepositoryManifest{}
-	if err = yaml.Unmarshal(fbytes, index.manifest); err != nil {
-		return
+	index.manifest, err = packagestructure.RepositoryManifestFromFile(ctx, repositoryManifestFilename, fbytes)
+	if err != nil {
+		return nil, err
 	}
 
 	dirs, err := fs.ReadDir(fsys, ".")
 	if err != nil {
-		return nil, false, err
+		return nil, err
 	}
 	for _, dir := range dirs {
 		if !dir.IsDir() {
@@ -71,7 +69,7 @@ func ReadRepositoryIndex(ctx context.Context, fsys FS) (index *RepositoryIndex, 
 		}
 		pi, err := ReadPackageIndex(ctx, fsys, dir.Name())
 		if err != nil {
-			return nil, false, err
+			return nil, err
 		}
 		index.packageIndexes[dir.Name()] = pi
 	}
@@ -130,7 +128,11 @@ func (ri *RepositoryIndex) Write(ctx context.Context) error {
 		})
 	}
 
-	indexBytes, err := yaml.Marshal(ri.manifest)
+	v1alpha1Manifest, err := packagestructure.ToV1Alpha1RepositoryManifest(ri.manifest)
+	if err != nil {
+		return err
+	}
+	indexBytes, err := yaml.Marshal(v1alpha1Manifest)
 	if err != nil {
 		return err
 	}

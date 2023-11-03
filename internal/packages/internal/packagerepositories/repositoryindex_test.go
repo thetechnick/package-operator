@@ -17,7 +17,7 @@ func TestRepositoryIndex(t *testing.T) {
 	fs := DirFS("testdata/repo")
 	ctx := context.Background()
 
-	ri, _, err := ReadRepositoryIndex(ctx, fs)
+	ri, err := ReadRepositoryIndex(ctx, fs)
 	require.NoError(t, err)
 
 	pkg := &packagetypes.Package{
