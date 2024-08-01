@@ -8,19 +8,29 @@ import (
 	"github.com/joeycumines/go-dotnotation/dotnotation"
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/utils/ptr"
 
 	"package-operator.run/internal/packages/internal/packagekickstart/parametrize"
 )
 
+type StatefulSetOptions struct {
+	DeploymentLikeOptions
+}
+
+func StatefulSet(
+	obj unstructured.Unstructured,
+	schema *apiextensionsv1.JSONSchemaProps,
+	imageContainer *ImageContainer,
+	opts StatefulSetOptions,
+) (
+	[]byte, error,
+) {
+	return deploymentLike(&obj, opts.DeploymentLikeOptions).Do(schema, imageContainer)
+}
+
 type DeploymentOptions struct {
-	Replicas      bool
-	Tolerations   bool
-	NodeSelectors bool
-	Images        bool
-	Resources     bool
-	Env           bool
-	GenericOptions
+	DeploymentLikeOptions
 }
 
 func Deployment(
@@ -31,9 +41,84 @@ func Deployment(
 ) (
 	[]byte, error,
 ) {
+	return deploymentLike(&obj, opts.DeploymentLikeOptions).Do(schema, imageContainer)
+}
+
+type DaemonSetOptions struct {
+	DeploymentLikeOptions
+}
+
+func DaemonSet(
+	obj unstructured.Unstructured,
+	schema *apiextensionsv1.JSONSchemaProps,
+	imageContainer *ImageContainer,
+	opts DaemonSetOptions,
+) (
+	[]byte, error,
+) {
+	return deploymentLike(&obj, opts.DeploymentLikeOptions).Do(schema, imageContainer)
+}
+
+type DeploymentLikeOptions struct {
+	Replicas      bool
+	Tolerations   bool
+	NodeSelectors bool
+	Images        bool
+	Resources     bool
+	Env           bool
+	GenericOptions
+}
+
+type genericDeploymentLikeParams struct {
+	opts DeploymentLikeOptions
+
+	obj          *unstructured.Unstructured
+	kindName     string // either Deployment, StatefulSet or DeamonSet.
+	resourceName string // either deployments, statefulsets or deamonsets
+}
+
+func deploymentLike(
+	obj *unstructured.Unstructured,
+	opts DeploymentLikeOptions,
+) *genericDeploymentLikeParams {
+	gk := obj.GetObjectKind().GroupVersionKind().GroupKind()
+
+	var resource string
+	switch gk {
+	case schema.GroupKind{
+		Group: "apps",
+		Kind:  "Deployment",
+	}:
+		resource = "deployments"
+	case schema.GroupKind{
+		Group: "apps",
+		Kind:  "StatefulSet",
+	}:
+		resource = "statefulsets"
+	case schema.GroupKind{
+		Group: "apps",
+		Kind:  "DaemonSet",
+	}:
+		resource = "daemonsets"
+	default:
+		return nil
+	}
+
+	return &genericDeploymentLikeParams{
+		opts:         opts,
+		obj:          obj,
+		kindName:     gk.Kind,
+		resourceName: resource,
+	}
+}
+
+func (p *genericDeploymentLikeParams) Do(
+	schema *apiextensionsv1.JSONSchemaProps,
+	imageContainer *ImageContainer,
+) ([]byte, error) {
 	var instructions []parametrize.Instruction
-	if opts.Namespaces {
-		if inst, ok := parametrizeNamespace(obj); ok {
+	if p.opts.Namespaces {
+		if inst, ok := parametrizeNamespace(p.obj); ok {
 			instructions = append(instructions, inst...)
 		}
 	}
@@ -47,30 +132,30 @@ func Deployment(
 	}
 
 	// Param options.
-	if opts.Replicas {
+	if p.opts.Replicas && p.kindName != "DaemonSet" {
 		instructions = append(instructions,
-			parametrizeDeploymentReplicas(obj, &configSchema)...)
+			p.replicas(p.obj, &configSchema)...)
 	}
-	if opts.NodeSelectors {
+	if p.opts.NodeSelectors {
 		instructions = append(instructions,
-			parametrizeDeploymentNodeSelector(obj, &configSchema)...)
+			p.nodeSelector(p.obj, &configSchema)...)
 	}
-	if opts.Images {
-		i, err := parametrizeDeploymentImages(obj, &configSchema, imageContainer)
+	if p.opts.Images {
+		i, err := p.images(p.obj, &configSchema, imageContainer)
 		if err != nil {
 			return nil, err
 		}
 		instructions = append(instructions, i...)
 	}
-	if opts.Tolerations {
-		i, err := parametrizeDeploymentTolerations(obj, &configSchema)
+	if p.opts.Tolerations {
+		i, err := p.tolerations(p.obj, &configSchema)
 		if err != nil {
 			return nil, err
 		}
 		instructions = append(instructions, i...)
 	}
-	if opts.Env || opts.Resources {
-		i, err := parametrizeDeploymentContainers(obj, &configSchema, opts)
+	if p.opts.Env || p.opts.Resources {
+		i, err := p.containers(p.obj, &configSchema)
 		if err != nil {
 			return nil, err
 		}
@@ -81,8 +166,8 @@ func Deployment(
 	if schema.Properties == nil {
 		schema.Properties = map[string]apiextensionsv1.JSONSchemaProps{}
 	}
-	if _, ok := schema.Properties["deployments"]; !ok {
-		schema.Properties["deployments"] = apiextensionsv1.JSONSchemaProps{
+	if _, ok := schema.Properties["statefulsets"]; !ok {
+		schema.Properties["statefulsets"] = apiextensionsv1.JSONSchemaProps{
 			Type:       "object",
 			Properties: map[string]apiextensionsv1.JSONSchemaProps{},
 			Default: &apiextensionsv1.JSON{
@@ -90,10 +175,10 @@ func Deployment(
 			},
 		}
 	}
-	if _, ok := schema.Properties["deployments"].
-		Properties[obj.GetNamespace()]; !ok {
-		schema.Properties["deployments"].
-			Properties[obj.GetNamespace()] = apiextensionsv1.JSONSchemaProps{
+	if _, ok := schema.Properties["statefulsets"].
+		Properties[p.obj.GetNamespace()]; !ok {
+		schema.Properties["statefulsets"].
+			Properties[p.obj.GetNamespace()] = apiextensionsv1.JSONSchemaProps{
 			Type:       "object",
 			Properties: map[string]apiextensionsv1.JSONSchemaProps{},
 			Default: &apiextensionsv1.JSON{
@@ -101,69 +186,69 @@ func Deployment(
 			},
 		}
 	}
-	schema.Properties["deployments"].
-		Properties[obj.GetNamespace()].
-		Properties[obj.GetName()] = configSchema
+	schema.Properties["statefulsets"].
+		Properties[p.obj.GetNamespace()].
+		Properties[p.obj.GetName()] = configSchema
 
-	out, err := parametrize.Execute(obj, instructions...)
+	out, err := parametrize.Execute(*p.obj, instructions...)
 	if err != nil {
 		return nil, err
 	}
 	return out, nil
 }
 
-func parametrizeDeploymentTolerations(
-	obj unstructured.Unstructured,
+func (p *genericDeploymentLikeParams) replicas(
+	obj *unstructured.Unstructured,
 	configSchema *apiextensionsv1.JSONSchemaProps,
-) ([]parametrize.Instruction, error) {
-	configSchema.Properties["tolerations"] = apiextensionsv1.JSONSchemaProps{
-		Type:        "array",
-		Description: fmt.Sprintf("Additional tolerations for Deployment %s/%s.", obj.GetNamespace(), obj.GetName()),
-		Default: &apiextensionsv1.JSON{
-			Raw: []byte("[]"),
-		},
-		Items: &apiextensionsv1.JSONSchemaPropsOrArray{
-			Schema: &apiextensionsv1.JSONSchemaProps{
-				Properties: map[string]apiextensionsv1.JSONSchemaProps{
-					"effect": {
-						Type: "string",
-					},
-					"key": {
-						Type: "string",
-					},
-					"operator": {
-						Type: "string",
-					},
-					"tolerationSeconds": {
-						Format: "int64",
-						Type:   "integer",
-					},
-					"value": {
-						Type: "string",
-					},
-				},
-				Type: "object",
-			},
-		},
-	}
-
-	_, err := dotnotation.Get(obj.Object, "spec.template.spec.tolerations")
+) []parametrize.Instruction {
+	originalValue, err := dotnotation.Get(obj.Object, "spec.replicas")
 	if err != nil {
-		if err := dotnotation.Set(obj.Object, "spec.template.spec.tolerations", []interface{}{}); err != nil {
-			return nil, err
-		}
+		originalValue = 1
+	}
+	configSchema.Properties["replicas"] = apiextensionsv1.JSONSchemaProps{
+		Type:   "integer",
+		Format: "int32",
+		Description: fmt.Sprintf(
+			"Replica count for %s %s/%s.",
+			p.kindName, obj.GetNamespace(), obj.GetName(),
+		),
+		Default: &apiextensionsv1.JSON{
+			Raw: []byte(fmt.Sprintf("%v", originalValue)),
+		},
 	}
 
-	tolerationsAccess := fmt.Sprintf(
-		`index .config "deployments" %q %q "tolerations"`,
-		obj.GetNamespace(), obj.GetName())
+	// access via index function because namespaces and names may have dashes in them.
+	replicasAccess := fmt.Sprintf(
+		`index .config %q %q %q "replicas"`,
+		p.resourceName, obj.GetNamespace(), obj.GetName())
 	return []parametrize.Instruction{
-		parametrize.MergeBlock(tolerationsAccess, "spec.template.spec.tolerations"),
-	}, nil
+		parametrize.Pipeline(replicasAccess, "spec.replicas"),
+	}
 }
 
-func parametrizeDeploymentImages(
-	obj unstructured.Unstructured,
+func (p *genericDeploymentLikeParams) nodeSelector(
+	obj *unstructured.Unstructured,
+	configSchema *apiextensionsv1.JSONSchemaProps,
+) []parametrize.Instruction {
+	configSchema.Properties["nodeSelector"] = apiextensionsv1.JSONSchemaProps{
+		Type: "object",
+		Description: fmt.Sprintf(
+			"NodeSelector for %s %s/%s.",
+			p.kindName, obj.GetNamespace(), obj.GetName(),
+		),
+		XPreserveUnknownFields: ptr.To(true),
+	}
+
+	nodeSelectorAccess := fmt.Sprintf(
+		`index .config %q %q %q "nodeSelector" | toJson`,
+		p.resourceName, obj.GetNamespace(), obj.GetName())
+	return []parametrize.Instruction{
+		parametrize.Pipeline(nodeSelectorAccess, "spec.template.spec.nodeSelector"),
+	}
+}
+
+func (p *genericDeploymentLikeParams) images(
+	obj *unstructured.Unstructured,
 	configSchema *apiextensionsv1.JSONSchemaProps,
 	imageContainer *ImageContainer,
 ) ([]parametrize.Instruction, error) {
@@ -205,56 +290,62 @@ func parametrizeDeploymentImages(
 	return instructions, nil
 }
 
-func parametrizeDeploymentNodeSelector(
-	obj unstructured.Unstructured,
+func (p *genericDeploymentLikeParams) tolerations(
+	obj *unstructured.Unstructured,
 	configSchema *apiextensionsv1.JSONSchemaProps,
-) []parametrize.Instruction {
-	configSchema.Properties["nodeSelector"] = apiextensionsv1.JSONSchemaProps{
-		Type: "object",
+) ([]parametrize.Instruction, error) {
+	configSchema.Properties["tolerations"] = apiextensionsv1.JSONSchemaProps{
+		Type: "array",
 		Description: fmt.Sprintf(
-			"NodeSelector for Deployment %s/%s.",
-			obj.GetNamespace(), obj.GetName()),
-		XPreserveUnknownFields: ptr.To(true),
-	}
-
-	nodeSelectorAccess := fmt.Sprintf(
-		`index .config "deployments" %q %q "nodeSelector" | toJson`,
-		obj.GetNamespace(), obj.GetName())
-	return []parametrize.Instruction{
-		parametrize.Pipeline(nodeSelectorAccess, "spec.template.spec.nodeSelector"),
-	}
-}
-
-func parametrizeDeploymentReplicas(
-	obj unstructured.Unstructured,
-	configSchema *apiextensionsv1.JSONSchemaProps,
-) []parametrize.Instruction {
-	originalValue, err := dotnotation.Get(obj.Object, "spec.replicas")
-	if err != nil {
-		originalValue = 1
-	}
-	configSchema.Properties["replicas"] = apiextensionsv1.JSONSchemaProps{
-		Type:        "integer",
-		Format:      "int32",
-		Description: fmt.Sprintf("Replica count for Deployment %s/%s.", obj.GetNamespace(), obj.GetName()),
+			"Additional tolerations for %s %s/%s.",
+			p.kindName, obj.GetNamespace(), obj.GetName(),
+		),
 		Default: &apiextensionsv1.JSON{
-			Raw: []byte(fmt.Sprintf("%v", originalValue)),
+			Raw: []byte("[]"),
+		},
+		Items: &apiextensionsv1.JSONSchemaPropsOrArray{
+			Schema: &apiextensionsv1.JSONSchemaProps{
+				Properties: map[string]apiextensionsv1.JSONSchemaProps{
+					"effect": {
+						Type: "string",
+					},
+					"key": {
+						Type: "string",
+					},
+					"operator": {
+						Type: "string",
+					},
+					"tolerationSeconds": {
+						Format: "int64",
+						Type:   "integer",
+					},
+					"value": {
+						Type: "string",
+					},
+				},
+				Type: "object",
+			},
 		},
 	}
 
-	// access via index function because namespaces and names may have dashes in them.
-	replicasAccess := fmt.Sprintf(
-		`index .config "deployments" %q %q "replicas"`,
-		obj.GetNamespace(), obj.GetName())
-	return []parametrize.Instruction{
-		parametrize.Pipeline(replicasAccess, "spec.replicas"),
+	_, err := dotnotation.Get(obj.Object, "spec.template.spec.tolerations")
+	if err != nil {
+		if err := dotnotation.Set(obj.Object, "spec.template.spec.tolerations", []interface{}{}); err != nil {
+			return nil, err
+		}
 	}
+
+	tolerationsAccess := fmt.Sprintf(
+		`index .config %q %q %q "tolerations"`,
+		p.resourceName, obj.GetNamespace(), obj.GetName())
+	return []parametrize.Instruction{
+		parametrize.MergeBlock(tolerationsAccess, "spec.template.spec.tolerations"),
+	}, nil
 }
 
-func parametrizeDeploymentContainers(
-	obj unstructured.Unstructured,
+func (p *genericDeploymentLikeParams) containers(
+	obj *unstructured.Unstructured,
 	configSchema *apiextensionsv1.JSONSchemaProps,
-	opts DeploymentOptions,
 ) ([]parametrize.Instruction, error) {
 	var instructions []parametrize.Instruction
 	configSchema.Properties["containers"] = apiextensionsv1.JSONSchemaProps{
@@ -283,7 +374,7 @@ func parametrizeDeploymentContainers(
 			},
 		}
 
-		if opts.Env {
+		if p.opts.Env {
 			configSchema.Properties["containers"].
 				Properties[name].
 				Properties["env"] = apiextensionsv1.JSONSchemaProps{
@@ -375,12 +466,13 @@ func parametrizeDeploymentContainers(
 			}
 
 			tolerationsAccess := fmt.Sprintf(
-				`index .config "deployments" %q %q "containers" %q "env"`,
-				obj.GetNamespace(), obj.GetName(), name)
+				`index .config %q %q %q "containers" %q "env"`,
+				p.resourceName, obj.GetNamespace(), obj.GetName(), name,
+			)
 			instructions = append(instructions, parametrize.MergeBlock(tolerationsAccess, envDotNotation))
 		}
 
-		if opts.Resources {
+		if p.opts.Resources {
 			originalResources, _, err := unstructured.NestedMap(c, "resources")
 			if err != nil {
 				return nil, err
@@ -423,8 +515,8 @@ func parametrizeDeploymentContainers(
 			}
 
 			nodeSelectorAccess := fmt.Sprintf(
-				`index .config "deployments" %q %q "containers" %q "resources" | toJson`,
-				obj.GetNamespace(), obj.GetName(), name)
+				`index .config %q %q %q "containers" %q "resources" | toJson`,
+				p.resourceName, obj.GetNamespace(), obj.GetName(), name)
 			instructions = append(instructions,
 				parametrize.Pipeline(nodeSelectorAccess,
 					fmt.Sprintf("spec.template.spec.containers.%d.resources", i)))

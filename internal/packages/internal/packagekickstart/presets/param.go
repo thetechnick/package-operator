@@ -72,17 +72,37 @@ func Parametrize(
 		return nil, false, nil
 	}
 
-	if obj.GroupVersionKind() == deployGVK {
+	dlopts := DeploymentLikeOptions{
+		Replicas:      opts.Replicas,
+		Tolerations:   opts.Tolerations,
+		NodeSelectors: opts.NodeSelectors,
+		Resources:     opts.Resources,
+		Env:           opts.Env,
+		Images:        opts.Images,
+		GenericOptions: GenericOptions{
+			Namespaces: opts.Namespaces,
+		},
+	}
+	switch obj.GroupVersionKind() {
+	case statefulSetGVK:
+		out, err := StatefulSet(obj, scheme, imageContainer, StatefulSetOptions{
+			DeploymentLikeOptions: dlopts,
+		})
+		if err != nil {
+			return nil, false, err
+		}
+		return out, true, nil
+	case daemonSetGVK:
+		out, err := DaemonSet(obj, scheme, imageContainer, DaemonSetOptions{
+			DeploymentLikeOptions: dlopts,
+		})
+		if err != nil {
+			return nil, false, err
+		}
+		return out, true, nil
+	case deployGVK:
 		out, err := Deployment(obj, scheme, imageContainer, DeploymentOptions{
-			Replicas:      opts.Replicas,
-			Tolerations:   opts.Tolerations,
-			NodeSelectors: opts.NodeSelectors,
-			Resources:     opts.Resources,
-			Env:           opts.Env,
-			Images:        opts.Images,
-			GenericOptions: GenericOptions{
-				Namespaces: opts.Namespaces,
-			},
+			DeploymentLikeOptions: dlopts,
 		})
 		if err != nil {
 			return nil, false, err

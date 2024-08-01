@@ -22,7 +22,7 @@ func Generic(
 ) {
 	var instructions []parametrize.Instruction
 	if opts.Namespaces {
-		if inst, ok := parametrizeNamespace(obj); ok {
+		if inst, ok := parametrizeNamespace(&obj); ok {
 			instructions = append(instructions, inst...)
 		}
 	}
@@ -38,7 +38,7 @@ func Generic(
 	return out, true, nil
 }
 
-func parametrizeNamespace(obj unstructured.Unstructured) (
+func parametrizeNamespace(obj *unstructured.Unstructured) (
 	[]parametrize.Instruction, bool,
 ) {
 	clusterRoleBindingGK := schema.GroupKind{
@@ -67,7 +67,7 @@ func parametrizeNamespace(obj unstructured.Unstructured) (
 		return instructions, true
 	}
 
-	if isClusterScoped(obj) {
+	if isClusterScoped(*obj) {
 		return nil, false
 	}
 

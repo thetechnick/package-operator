@@ -11,16 +11,15 @@ import (
 	manifestsv1alpha1 "package-operator.run/apis/manifests/v1alpha1"
 )
 
-var deploy = unstructured.Unstructured{
+var daemonSet = unstructured.Unstructured{
 	Object: map[string]interface{}{
 		"apiVersion": "apps/v1",
-		"kind":       "Deployment",
+		"kind":       "DaemonSet",
 		"metadata": map[string]interface{}{
 			"name":      "banana",
 			"namespace": "fruits",
 		},
 		"spec": map[string]interface{}{
-			"replicas": int64(1),
 			"template": map[string]interface{}{
 				"spec": map[string]interface{}{
 					"affinity": nil,
@@ -42,11 +41,11 @@ var deploy = unstructured.Unstructured{
 	},
 }
 
-func TestDeployment(t *testing.T) {
+func TestDaemonSet(t *testing.T) {
 	t.Parallel()
 	scheme := &apiextensionsv1.JSONSchemaProps{}
 	image := &ImageContainer{}
-	out, ok, err := Parametrize(*deploy.DeepCopy(), scheme, image, ParametrizeOptions{
+	out, ok, err := Parametrize(*daemonSet.DeepCopy(), scheme, image, ParametrizeOptions{
 		Namespaces:    true,
 		Replicas:      true,
 		Images:        true,
@@ -60,12 +59,11 @@ func TestDeployment(t *testing.T) {
 	require.NoError(t, err)
 	assert.True(t, ok)
 	assert.Equal(t, `apiVersion: apps/v1
-kind: Deployment
+kind: DaemonSet
 metadata:
   name: banana
   namespace: {{ default (index .config.namespaces "fruits") .config.namespace }}
 spec:
-  replicas: {{ index .config "deployments" "fruits" "banana" "replicas" }}
   template:
     spec:
       affinity: null
@@ -75,8 +73,8 @@ spec:
           value: xxx
         image: {{ index .images "banana" }}
         name: banana
-        resources: {{ index .config "deployments" "fruits" "banana" "containers" "banana" "resources" | toJson }}
-      nodeSelector: {{ index .config "deployments" "fruits" "banana" "nodeSelector" | toJson }}
+        resources: {{ index .config "daemonsets" "fruits" "banana" "containers" "banana" "resources" | toJson }}
+      nodeSelector: {{ index .config "daemonsets" "fruits" "banana" "nodeSelector" | toJson }}
 `, string(out))
 	assert.Equal(t, []manifestsv1alpha1.PackageManifestImage{
 		{
@@ -84,28 +82,4 @@ spec:
 			Image: "quay.io/package-operator/banana:latest",
 		},
 	}, image.List())
-}
-
-func Test_parametrizeDeploymentTolerations(t *testing.T) {
-	t.Parallel()
-	scheme := &apiextensionsv1.JSONSchemaProps{
-		Properties: map[string]apiextensionsv1.JSONSchemaProps{},
-	}
-	l := deploymentLike(deploy.DeepCopy(), DeploymentLikeOptions{})
-	inst, err := l.tolerations(deploy.DeepCopy(), scheme)
-	require.NoError(t, err)
-	assert.Len(t, inst, 1)
-}
-
-func Test_parametrizeDeploymentContainers(t *testing.T) {
-	t.Parallel()
-	scheme := &apiextensionsv1.JSONSchemaProps{
-		Properties: map[string]apiextensionsv1.JSONSchemaProps{},
-	}
-	l := deploymentLike(deploy.DeepCopy(), DeploymentLikeOptions{
-		Env: true,
-	})
-	inst, err := l.containers(deploy.DeepCopy(), scheme)
-	require.NoError(t, err)
-	assert.Len(t, inst, 1)
 }
