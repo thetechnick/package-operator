@@ -23,8 +23,7 @@ import (
 	corev1alpha1 "package-operator.run/apis/core/v1alpha1"
 	"package-operator.run/internal/constants"
 	"package-operator.run/internal/controllers/hostedclusters/hypershift/v1beta1"
-
-	"pkg.package-operator.run/boxcutter/ownerhandling"
+	"package-operator.run/internal/ownerhandling"
 )
 
 type HostedClusterController struct {

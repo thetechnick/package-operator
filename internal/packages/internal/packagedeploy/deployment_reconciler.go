@@ -14,14 +14,13 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/util/retry"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
 	corev1alpha1 "package-operator.run/apis/core/v1alpha1"
 	manifestsv1alpha1 "package-operator.run/apis/manifests/v1alpha1"
 	"package-operator.run/internal/adapters"
 	"package-operator.run/internal/constants"
 	"package-operator.run/internal/utils"
-
-	"pkg.package-operator.run/boxcutter/ownerhandling"
 )
 
 type (
@@ -46,7 +45,6 @@ type DeploymentReconciler struct {
 	newObjectSlice      adapters.ObjectSliceFactory
 	newObjectSliceList  adapters.ObjectSliceListFactory
 	newObjectSetList    genericObjectSetListFactory
-	ownerStrategy       ownerStrategy
 }
 
 func newDeploymentReconciler(
@@ -64,7 +62,6 @@ func newDeploymentReconciler(
 		newObjectSlice:      newObjectSlice,
 		newObjectSliceList:  newObjectSliceList,
 		newObjectSetList:    newObjectSetList,
-		ownerStrategy:       ownerhandling.NewNative(scheme),
 	}
 }
 
@@ -286,7 +283,10 @@ func (r *DeploymentReconciler) reconcileSliceWithCollisionCount(
 	slice.ClientObject().SetName(name)
 
 	// controller ref, so Slices get auto garbage collected when the Deployment get's deleted.
-	if err := r.ownerStrategy.SetControllerReference(deploy.ClientObject(), slice.ClientObject()); err != nil {
+	if err := controllerutil.SetControllerReference(
+		deploy.ClientObject(), slice.ClientObject(),
+		r.scheme,
+	); err != nil {
 		return fmt.Errorf("set controller reference: %w", err)
 	}
 
@@ -310,7 +310,13 @@ func (r *DeploymentReconciler) reconcileSliceWithCollisionCount(
 		return fmt.Errorf("getting conflicting ObjectSlice: %w", err)
 	}
 	// object already exists, check for hash collision
-	isController := r.ownerStrategy.IsController(deploy.ClientObject(), conflictingSlice.ClientObject())
+	isController, err := controllerutil.HasOwnerReference(
+		conflictingSlice.ClientObject().GetOwnerReferences(),
+		deploy.ClientObject(), r.scheme,
+	)
+	if err != nil {
+		return fmt.Errorf("HasOwnerReference on conflicting ObjectSlice: %w", err)
+	}
 	isEqual := equality.Semantic.DeepEqual(conflictingSlice.GetObjects(), slice.GetObjects())
 	if isController && isEqual {
 		// we are controller and object is equal

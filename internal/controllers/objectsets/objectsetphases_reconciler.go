@@ -20,11 +20,11 @@ import (
 	"package-operator.run/internal/adapters"
 	"package-operator.run/internal/constants"
 	"package-operator.run/internal/controllers"
+	"package-operator.run/internal/ownerhandling"
 	"package-operator.run/internal/preflight"
 	internalprobing "package-operator.run/internal/probing"
 
 	"pkg.package-operator.run/boxcutter/managedcache"
-	"pkg.package-operator.run/boxcutter/ownerhandling"
 )
 
 // objectSetPhasesReconciler reconciles all phases within an ObjectSet.

@@ -36,9 +36,14 @@ type objectSetPhaseReconciler struct {
 	uncachedclient          client.Client
 	phaseEngineFactory      boxcutterutil.PhaseEngineFactory
 	lookupPreviousRevisions lookupPreviousRevisions
-	ownerStrategy           boxcutterutil.OwnerStrategy
 	backoff                 *flowcontrol.Backoff
+	metadataStrategy        boxcutter.MetadataStrategy
 }
+
+type metadataFactoryFn func(
+	owner client.Object,
+	scheme *runtime.Scheme,
+) types.RevisionMetadata
 
 func newObjectSetPhaseReconciler(
 	scheme *runtime.Scheme,
@@ -46,7 +51,7 @@ func newObjectSetPhaseReconciler(
 	uncachedClient client.Client,
 	phaseEngineFactory boxcutterutil.PhaseEngineFactory,
 	lookupPreviousRevisions lookupPreviousRevisions,
-	ownerStrategy boxcutterutil.OwnerStrategy,
+	metadataStrategy boxcutter.MetadataStrategy,
 ) *objectSetPhaseReconciler {
 	var cfg objectSetPhaseReconcilerConfig
 
@@ -58,8 +63,8 @@ func newObjectSetPhaseReconciler(
 		uncachedclient:          uncachedClient,
 		phaseEngineFactory:      phaseEngineFactory,
 		lookupPreviousRevisions: lookupPreviousRevisions,
-		ownerStrategy:           ownerStrategy,
 		backoff:                 cfg.GetBackoff(),
+		metadataStrategy:        metadataStrategy,
 	}
 }
 
@@ -75,6 +80,10 @@ func (r *objectSetPhaseReconciler) Reconcile(
 	previous, err := r.lookupPreviousRevisions(ctx, objectSetPhase)
 	if err != nil {
 		return res, fmt.Errorf("lookup previous revisions: %w", err)
+	}
+	previousMeta := make([]boxcutter.RevisionMetadata, 0, len(previous))
+	for _, prev := range previous {
+		previousMeta = append(previousMeta, r.metadataStrategy.NewRevisionMetadata(prev))
 	}
 
 	probe, err := internalprobing.Parse(
@@ -117,15 +126,16 @@ func (r *objectSetPhaseReconciler) Reconcile(
 			&apiPhase.Objects[i].Object,
 			boxcutterutil.TranslateCollisionProtection(apiPhase.Objects[i].CollisionProtection),
 			types.WithProbe(types.ProgressProbeType, probe),
-			boxcutter.WithPreviousOwners(previous),
+			boxcutter.WithPreviousOwners(previousMeta),
 		))
 	}
 	if objectSetPhase.IsSpecPaused() {
 		phaseReconcileOptions = append(phaseReconcileOptions, types.WithPaused{})
 	}
 
+	objectSetPhaseMeta := r.metadataStrategy.NewRevisionMetadata(objectSetPhase.ClientObject())
 	result, err := phaseEngine.Reconcile(ctx,
-		objectSetPhase.ClientObject(),
+		objectSetPhaseMeta,
 		objectSetPhase.GetStatusRevision(),
 		types.Phase{
 			Name:    apiPhase.Name,
@@ -171,7 +181,7 @@ func (r *objectSetPhaseReconciler) Reconcile(
 	}
 
 	objectSetPhase.SetStatusControllerOf(
-		boxcutterutil.GetControllerOf(r.ownerStrategy, objectSetPhase.ClientObject(), result))
+		boxcutterutil.GetControllerOf(objectSetPhaseMeta, result))
 
 	if !result.IsComplete() {
 		meta.SetStatusCondition(
@@ -233,8 +243,9 @@ func (r *objectSetPhaseReconciler) Teardown(
 		)
 	}
 
+	objectSetPhaseMeta := r.metadataStrategy.NewRevisionMetadata(objectSetPhase.ClientObject())
 	result, err := phaseEngine.Teardown(ctx,
-		objectSetPhase.ClientObject(),
+		objectSetPhaseMeta,
 		objectSetPhase.GetStatusRevision(),
 		types.Phase{
 			Name:    apiPhase.Name,

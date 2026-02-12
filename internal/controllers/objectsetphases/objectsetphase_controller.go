@@ -20,8 +20,8 @@ import (
 	"package-operator.run/internal/controllers"
 	"package-operator.run/internal/controllers/boxcutterutil"
 
+	"pkg.package-operator.run/boxcutter"
 	"pkg.package-operator.run/boxcutter/managedcache"
-	"pkg.package-operator.run/boxcutter/ownerhandling"
 	"pkg.package-operator.run/boxcutter/validation"
 )
 
@@ -52,13 +52,13 @@ type teardownHandler interface {
 type GenericObjectSetPhaseController struct {
 	newObjectSetPhase adapters.ObjectSetPhaseFactory
 
-	class           string // Phase class this controller is operating for.
-	log             logr.Logger
-	scheme          *runtime.Scheme
-	client          client.Client // client to get and update ObjectSetPhases.
-	accessManager   managedcache.ObjectBoundAccessManager[client.Object]
-	ownerStrategy   ownerStrategy
-	teardownHandler teardownHandler
+	class            string // Phase class this controller is operating for.
+	log              logr.Logger
+	scheme           *runtime.Scheme
+	client           client.Client // client to get and update ObjectSetPhases.
+	accessManager    managedcache.ObjectBoundAccessManager[client.Object]
+	teardownHandler  teardownHandler
+	metadataStrategy boxcutter.MetadataStrategy
 
 	reconciler []reconciler
 }
@@ -75,12 +75,12 @@ func NewMultiClusterObjectSetPhaseController(
 	return NewGenericObjectSetPhaseController(
 		adapters.NewObjectSetPhaseAccessor,
 		adapters.NewObjectSet,
-		ownerhandling.NewAnnotation(scheme, constants.OwnerStrategyAnnotationKey),
 		log, scheme, accessManager,
 		class, client,
 		discoveryClient,
 		targetRESTMapper,
-		validation.NewClusterPhaseValidator(targetRESTMapper, targetWriter),
+		validation.NewPhaseValidator(targetRESTMapper, targetWriter),
+		boxcutter.NewAnnotationMetadataStrategy(constants.OwnerStrategyAnnotationKey, scheme),
 	)
 }
 
@@ -96,12 +96,12 @@ func NewMultiClusterClusterObjectSetPhaseController(
 	return NewGenericObjectSetPhaseController(
 		adapters.NewClusterObjectSetPhaseAccessor,
 		adapters.NewClusterObjectSet,
-		ownerhandling.NewAnnotation(scheme, constants.OwnerStrategyAnnotationKey),
 		log, scheme, accessManager,
 		class, client,
 		discoveryClient,
 		targetRESTMapper,
-		validation.NewClusterPhaseValidator(targetRESTMapper, targetWriter),
+		validation.NewPhaseValidator(targetRESTMapper, client),
+		boxcutter.NewAnnotationMetadataStrategy(constants.OwnerStrategyAnnotationKey, scheme),
 	)
 }
 
@@ -116,12 +116,12 @@ func NewSameClusterObjectSetPhaseController(
 	return NewGenericObjectSetPhaseController(
 		adapters.NewObjectSetPhaseAccessor,
 		adapters.NewObjectSet,
-		ownerhandling.NewNative(scheme),
 		log, scheme, accessManager,
 		class, client,
 		discoveryClient,
 		restMapper,
-		validation.NewNamespacedPhaseValidator(restMapper, client),
+		validation.NewPhaseValidator(restMapper, client),
+		boxcutter.NewNativeMetadataStrategy(scheme, restMapper),
 	)
 }
 
@@ -136,19 +136,18 @@ func NewSameClusterClusterObjectSetPhaseController(
 	return NewGenericObjectSetPhaseController(
 		adapters.NewClusterObjectSetPhaseAccessor,
 		adapters.NewClusterObjectSet,
-		ownerhandling.NewNative(scheme),
 		log, scheme, accessManager,
 		class, client,
 		discoveryClient,
 		restMapper,
-		validation.NewNamespacedPhaseValidator(restMapper, client),
+		validation.NewPhaseValidator(restMapper, client),
+		boxcutter.NewNativeMetadataStrategy(scheme, restMapper),
 	)
 }
 
 func NewGenericObjectSetPhaseController(
 	newObjectSetPhase adapters.ObjectSetPhaseFactory,
 	newObjectSet adapters.ObjectSetAccessorFactory,
-	ownerStrategy boxcutterutil.OwnerStrategy,
 	log logr.Logger, scheme *runtime.Scheme,
 	accessManager managedcache.ObjectBoundAccessManager[client.Object],
 	class string,
@@ -156,6 +155,7 @@ func NewGenericObjectSetPhaseController(
 	discoveryClient boxcutterutil.DiscoveryClient,
 	targetRESTMapper meta.RESTMapper,
 	phaseValidator *validation.PhaseValidator,
+	metadataStrategy boxcutter.MetadataStrategy,
 ) *GenericObjectSetPhaseController {
 	controller := &GenericObjectSetPhaseController{
 		newObjectSetPhase: newObjectSetPhase,
@@ -164,21 +164,21 @@ func NewGenericObjectSetPhaseController(
 		log:    log,
 		scheme: scheme,
 
-		client:        client,
-		ownerStrategy: ownerStrategy,
-		accessManager: accessManager,
+		client:           client,
+		accessManager:    accessManager,
+		metadataStrategy: metadataStrategy,
 	}
 	phaseReconciler := newObjectSetPhaseReconciler(
 		scheme,
 		accessManager,
 		client,
 		boxcutterutil.NewPhaseEngineFactory(
-			scheme, discoveryClient, targetRESTMapper, ownerStrategy, phaseValidator),
+			scheme, discoveryClient, targetRESTMapper, phaseValidator),
 		controllers.NewPreviousRevisionLookup(
 			scheme, func(s *runtime.Scheme) controllers.PreviousObjectSet {
 				return newObjectSet(s)
 			}, client).LookupPreviousRemotePhases,
-		ownerStrategy,
+		metadataStrategy,
 	)
 	controller.teardownHandler = phaseReconciler
 	controller.reconciler = []reconciler{
@@ -295,7 +295,7 @@ func (c *GenericObjectSetPhaseController) SetupWithManager(
 		For(objectSetPhase).
 		WatchesRawSource(
 			c.accessManager.Source(
-				c.ownerStrategy.EnqueueRequestForOwner(objectSetPhase, mgr.GetRESTMapper(), false),
+				c.metadataStrategy.EnqueueRequestForOwner(objectSetPhase, false),
 				predicate.NewPredicateFuncs(func(object client.Object) bool {
 					c.log.V(constants.LogLevelDebug).Info(
 						"processing dynamic cache event",

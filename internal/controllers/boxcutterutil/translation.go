@@ -1,10 +1,9 @@
 package boxcutterutil
 
 import (
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"pkg.package-operator.run/boxcutter"
 	"pkg.package-operator.run/boxcutter/machinery"
 	"pkg.package-operator.run/boxcutter/machinery/types"
-	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	corev1alpha1 "package-operator.run/apis/core/v1alpha1"
 )
@@ -22,17 +21,14 @@ func TranslateCollisionProtection(in corev1alpha1.CollisionProtection) types.Wit
 	}
 }
 
-type isControllerChecker interface {
-	IsController(owner, obj metav1.Object) bool
-}
-
-func GetControllerOf(ownerStrategy isControllerChecker, owner client.Object,
+func GetControllerOf(
+	owner boxcutter.RevisionMetadata,
 	result machinery.PhaseResult,
 ) []corev1alpha1.ControlledObjectReference {
 	objects := result.GetObjects()
 	controllerOf := make([]corev1alpha1.ControlledObjectReference, 0, len(objects))
 	for _, object := range objects {
-		if !ownerStrategy.IsController(owner, object.Object()) {
+		if !owner.IsCurrent(object.Object()) {
 			continue
 		}
 		controllerOf = append(controllerOf, corev1alpha1.ControlledObjectReference{

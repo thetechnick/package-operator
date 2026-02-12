@@ -11,6 +11,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	k8stypes "k8s.io/apimachinery/pkg/types"
+	"pkg.package-operator.run/boxcutter"
 	"pkg.package-operator.run/boxcutter/machinery"
 	"pkg.package-operator.run/boxcutter/machinery/types"
 	"pkg.package-operator.run/boxcutter/validation"
@@ -77,7 +78,6 @@ func TestGetControllerOf(t *testing.T) {
 	t.Run("returns empty list when no objects", func(t *testing.T) {
 		t.Parallel()
 
-		ownerStrategy := &isControllerCheckerMock{}
 		scheme := testutil.NewTestSchemeWithCoreV1Alpha1()
 		owner := adapters.NewObjectSet(scheme)
 		owner.ClientObject().SetName("test-owner")
@@ -86,7 +86,9 @@ func TestGetControllerOf(t *testing.T) {
 			objects: []machinery.ObjectResult{},
 		}
 
-		result := GetControllerOf(ownerStrategy, owner.ClientObject(), phaseResult)
+		ownerMeta := boxcutter.NewNativeRevisionMetadata(
+			owner.ClientObject(), scheme)
+		result := GetControllerOf(ownerMeta, phaseResult)
 
 		assert.Empty(t, result)
 	})

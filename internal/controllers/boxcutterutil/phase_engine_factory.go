@@ -24,14 +24,14 @@ import (
 type PhaseEngine interface {
 	Reconcile(
 		ctx context.Context,
-		owner client.Object,
+		owner boxcutter.RevisionMetadata,
 		revision int64,
 		phase types.Phase,
 		opts ...types.PhaseReconcileOption,
 	) (machinery.PhaseResult, error)
 	Teardown(
 		ctx context.Context,
-		owner client.Object,
+		owner boxcutter.RevisionMetadata,
 		revision int64,
 		phase types.Phase,
 		opts ...types.PhaseTeardownOption,
@@ -46,8 +46,8 @@ type phaseEngineFactory struct {
 	scheme          *runtime.Scheme
 	discoveryClient DiscoveryClient
 	restMapper      meta.RESTMapper
-	ownerStrategy   boxcutter.OwnerStrategy
-	phaseValidator  *validation.PhaseValidator
+
+	phaseValidator *validation.PhaseValidator
 }
 
 type OwnerStrategy interface {
@@ -71,14 +71,12 @@ func NewPhaseEngineFactory(
 	scheme *runtime.Scheme,
 	discoveryClient DiscoveryClient,
 	restMapper meta.RESTMapper,
-	ownerStrategy OwnerStrategy,
 	phaseValidator *validation.PhaseValidator,
 ) PhaseEngineFactory {
 	return phaseEngineFactory{
 		scheme:          scheme,
 		discoveryClient: discoveryClient,
 		restMapper:      restMapper,
-		ownerStrategy:   ownerStrategy,
 		phaseValidator:  phaseValidator,
 	}
 }
@@ -92,7 +90,6 @@ func (f phaseEngineFactory) New(accessor managedcache.Accessor) (PhaseEngine, er
 		RestMapper:      f.restMapper,
 		Writer:          accessor,
 		Reader:          accessor,
-		OwnerStrategy:   f.ownerStrategy,
 		PhaseValidator:  f.phaseValidator,
 	})
 	if err != nil {

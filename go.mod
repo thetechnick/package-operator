@@ -2,6 +2,8 @@ module package-operator.run
 
 go 1.25.3
 
+replace pkg.package-operator.run/boxcutter => ../boxcutter-2
+
 require (
 	github.com/Masterminds/sprig/v3 v3.3.0
 	github.com/bmatcuk/doublestar v1.3.4
